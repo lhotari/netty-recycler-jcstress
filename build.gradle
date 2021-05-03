@@ -1,0 +1,19 @@
+plugins {
+    id "java"
+    id "io.github.reyerizo.gradle.jcstress" version "0.8.11"
+}
+
+repositories {
+    mavenCentral()
+}
+
+jcstress {
+    //mode = 'stress'
+    jcstressDependency 'org.openjdk.jcstress:jcstress-core:0.10'
+}
+
+dependencies {
+    jcstressImplementation 'io.netty:netty-common:4.1.59.Final'
+    jcstressImplementation 'org.jctools:jctools-core:3.1.0'
+    jcstressImplementation 'org.apache.bookkeeper:bookkeeper-common:4.13.0'
+}
