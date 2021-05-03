@@ -2,7 +2,9 @@ package io.github.lhotari.nettyrecyclerjcstress;
 
 import io.netty.util.Recycler;
 import io.netty.util.concurrent.DefaultThreadFactory;
-import org.apache.bookkeeper.common.util.OrderedExecutor;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 import org.apache.bookkeeper.common.util.SafeRunnable;
 import org.jctools.queues.MpmcArrayQueue;
 import org.openjdk.jcstress.annotations.Actor;
@@ -72,9 +74,10 @@ public class NettyRecyclerMultithreadTest {
 
     private static final MpmcArrayQueue<Holder> QUEUE = new MpmcArrayQueue<>(8192);
     private static final MpmcArrayQueue<ResultHolder> QUEUE2 = new MpmcArrayQueue<>(8192);
-    private static final OrderedExecutor EXECUTOR = OrderedExecutor.newBuilder()
-            .threadFactory(new DefaultThreadFactory(OrderedExecutor.class, true))
-            .build();
+    private static final ScheduledExecutorService EXECUTOR =
+            Executors.newSingleThreadScheduledExecutor(new DefaultThreadFactory("EXECUTOR", true));
+    private static final ScheduledExecutorService EXECUTOR2 =
+            Executors.newSingleThreadScheduledExecutor(new DefaultThreadFactory("EXECUTOR2", true));
 
     private static final Recycler<Holder> RECYCLER = new Recycler<Holder>() {
         @Override
@@ -85,16 +88,18 @@ public class NettyRecyclerMultithreadTest {
 
     @Actor
     public void actor1() {
-        Holder h = RECYCLER.get();
-        h.a = 1;
-        QUEUE.offer(h);
+        EXECUTOR.schedule(SafeRunnable.safeRun(() -> {
+            Holder h = RECYCLER.get();
+            h.a = 1;
+            QUEUE.relaxedOffer(h);
+        }), 1L, TimeUnit.NANOSECONDS);
     }
 
     @Actor
     public void actor2() {
-        Holder h = QUEUE.poll();
+        Holder h = QUEUE.relaxedPoll();
         if (h != null) {
-            EXECUTOR.executeOrdered(h.hashCode(), SafeRunnable.safeRun(() -> {
+            EXECUTOR2.schedule(SafeRunnable.safeRun(() -> {
                 IIIIIIII_Result r = new IIIIIIII_Result();
                 r.r1 = h.a;
                 r.r2 = h.a;
@@ -107,7 +112,7 @@ public class NettyRecyclerMultithreadTest {
                 r.r8 = h.a;
                 h.recycle();
                 QUEUE2.offer(new ResultHolder(r));
-            }));
+            }), 1L, TimeUnit.NANOSECONDS);
         } else {
             Thread.yield();
         }
