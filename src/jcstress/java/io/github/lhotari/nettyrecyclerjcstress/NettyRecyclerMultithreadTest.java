@@ -5,6 +5,7 @@ import io.netty.util.concurrent.DefaultThreadFactory;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.bookkeeper.common.util.SafeRunnable;
 import org.jctools.queues.MpmcArrayQueue;
 import org.openjdk.jcstress.annotations.Actor;
@@ -15,12 +16,13 @@ import org.openjdk.jcstress.annotations.JCStressTest;
 import org.openjdk.jcstress.annotations.Outcome;
 import org.openjdk.jcstress.annotations.State;
 import org.openjdk.jcstress.infra.results.IIIIIIII_Result;
+import org.openjdk.jcstress.infra.results.IIIIIII_Result;
 
 @JCStressTest
 @State
 @Description("Test Netty Recycler behavior with multiple threads.")
-@Outcome(id = "-1, -1, -1, -1, -1, -1, -1, -1", expect = Expect.ACCEPTABLE, desc = "Queue underrun")
-@Outcome(id = "1, 1, 1, 1, 2, 2, 2, 2", expect = Expect.ACCEPTABLE, desc = "Normal case")
+@Outcome(id = "-1, -1, -1, -1, -1, -1, -1", expect = Expect.ACCEPTABLE, desc = "Queue underrun")
+@Outcome(id = "1, 1, 1, 2, 2, 2, 1", expect = Expect.ACCEPTABLE, desc = "Normal case")
 public class NettyRecyclerMultithreadTest {
     static {
         System.setProperty("io.netty.recycler.maxCapacity.default", "1000");
@@ -48,9 +50,8 @@ public class NettyRecyclerMultithreadTest {
         private final int r5;
         private final int r6;
         private final int r7;
-        private final int r8;
 
-        ResultHolder(IIIIIIII_Result r) {
+        ResultHolder(IIIIIII_Result r) {
             r1 = r.r1;
             r2 = r.r2;
             r3 = r.r3;
@@ -58,10 +59,9 @@ public class NettyRecyclerMultithreadTest {
             r5 = r.r5;
             r6 = r.r6;
             r7 = r.r7;
-            r8 = r.r8;
         }
 
-        void applyToResult(IIIIIIII_Result r) {
+        void applyToResult(IIIIIII_Result r) {
             r.r1 = r1;
             r.r2 = r2;
             r.r3 = r3;
@@ -69,7 +69,6 @@ public class NettyRecyclerMultithreadTest {
             r.r5 = r5;
             r.r6 = r6;
             r.r7 = r7;
-            r.r8 = r8;
         }
     }
 
@@ -89,31 +88,35 @@ public class NettyRecyclerMultithreadTest {
     };
 
     @Actor
-    public void actor1() {
+    public void actor() {
         EXECUTOR.schedule(SafeRunnable.safeRun(() -> {
             Holder h = RECYCLER.get();
             h.a = 1;
             EXECUTOR2.schedule(SafeRunnable.safeRun(() -> {
-                IIIIIIII_Result r = new IIIIIIII_Result();
+                IIIIIII_Result r = new IIIIIII_Result();
                 r.r1 = h.a;
                 r.r2 = h.a;
                 r.r3 = h.a;
-                r.r4 = h.a;
-                h.a = 2;
+                AtomicInteger executed = new AtomicInteger(0);
+                // execute in the background to break happens before
                 EXECUTOR3.schedule(SafeRunnable.safeRun(() -> {
+                    r.r4 = h.a;
                     r.r5 = h.a;
                     r.r6 = h.a;
-                    r.r7 = h.a;
-                    r.r8 = h.a;
+                    r.r7 = executed.get();
                     h.recycle();
                     QUEUE.offer(new ResultHolder(r));
-                }), 1L, TimeUnit.NANOSECONDS);
+                }), 20L, TimeUnit.MILLISECONDS);
+                h.a = 2;
+                executed.set(1);
+
+
             }), 1L, TimeUnit.NANOSECONDS);
         }), 1L, TimeUnit.NANOSECONDS);
     }
 
     @Arbiter
-    public void arbiter(IIIIIIII_Result r) {
+    public void arbiter(IIIIIII_Result r) {
         ResultHolder rh = QUEUE.poll();
         if (rh != null) {
             rh.applyToResult(r);
@@ -125,7 +128,6 @@ public class NettyRecyclerMultithreadTest {
             r.r5 = -1;
             r.r6 = -1;
             r.r7 = -1;
-            r.r8 = -1;
             Thread.yield();
         }
     }
