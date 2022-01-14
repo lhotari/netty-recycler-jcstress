@@ -99,18 +99,17 @@ public class NettyRecyclerMultithreadTest {
                 r.r3 = h.a;
                 AtomicInteger executed = new AtomicInteger(0);
                 // execute in the background to break happens before
-                EXECUTOR3.schedule(SafeRunnable.safeRun(() -> {
+                SafeRunnable job = SafeRunnable.safeRun(() -> {
                     r.r4 = h.a;
                     r.r5 = h.a;
                     r.r6 = h.a;
                     r.r7 = executed.get();
                     h.recycle();
                     QUEUE.offer(new ResultHolder(r));
-                }), 20L, TimeUnit.MILLISECONDS);
+                });
                 h.a = 2;
                 executed.set(1);
-
-
+                EXECUTOR3.schedule(job, 20L, TimeUnit.MILLISECONDS);
             }), 1L, TimeUnit.NANOSECONDS);
         }), 1L, TimeUnit.NANOSECONDS);
     }
