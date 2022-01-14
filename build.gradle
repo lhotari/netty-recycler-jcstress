@@ -9,6 +9,7 @@ repositories {
 
 jcstress {
     //mode = 'stress'
+    jvmArgs = '-XX:+StressLCM -XX:+StressGCM'
     jcstressDependency 'org.openjdk.jcstress:jcstress-core:0.15'
 }
 
