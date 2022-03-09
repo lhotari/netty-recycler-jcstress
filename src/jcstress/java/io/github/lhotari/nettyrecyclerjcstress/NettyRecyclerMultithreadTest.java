@@ -26,6 +26,7 @@ import org.openjdk.jcstress.infra.results.IIIIIII_Result;
 public class NettyRecyclerMultithreadTest {
     static {
         System.setProperty("io.netty.recycler.ratio", "1");
+        System.setProperty("io.netty.recycler.maxCapacityPerThread", "1000000");
     }
 
     private static class Holder {
