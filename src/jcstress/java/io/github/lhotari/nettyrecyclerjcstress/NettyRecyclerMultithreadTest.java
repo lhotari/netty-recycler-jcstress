@@ -24,11 +24,6 @@ import org.openjdk.jcstress.infra.results.IIIIIII_Result;
 @Outcome(id = "-1, -1, -1, -1, -1, -1, -1", expect = Expect.ACCEPTABLE, desc = "Queue underrun")
 @Outcome(id = "1, 1, 1, 2, 2, 2, 1", expect = Expect.ACCEPTABLE, desc = "Normal case")
 public class NettyRecyclerMultithreadTest {
-    static {
-        System.setProperty("io.netty.recycler.maxCapacity.default", "1000");
-        System.setProperty("io.netty.recycler.linkCapacity", "1024");
-    }
-
     private static class Holder {
         private final Recycler.Handle<Holder> handle;
         int a;
